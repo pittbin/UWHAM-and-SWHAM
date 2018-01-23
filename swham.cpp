@@ -20,7 +20,6 @@ const double kB = 0.0019872041; // unit kcal/mol
 const double pi = 3.1415926;
 const double cal2J = 4.184;
 
-
 int nstates = 0; // how many walks or thermodynamic states
 int npara = 0; // how many parameters
 int ndata = 0; // how mnay data for one observation
@@ -38,7 +37,13 @@ double potential_energy(int stateid, int datasid, int datanid) {
 	double unitfactor;
 	
 	switch (inunit) {
-	case 0: unitfactor = paralist[datasid][0]/paralist[stateid][0]; break;
+	case 0: if (pftype==0) {
+			unitfactor = 1.0;
+		}
+		else {
+			unitfactor = paralist[datasid][0]/paralist[stateid][0]; 
+		}
+		break;		
 	case 1: unitfactor = 1.0/(kB*paralist[stateid][0]); break;
 	case 2: unitfactor = 1.0/(cal2J*kB*paralist[stateid][0]); break;
 	}
@@ -477,7 +482,7 @@ int main(int argc, char* argv[]) {
 	const char* freeEfile="";
 	vector<vector<int> > freeElist;
 
-	double temper = 300.0;	
+	double temper = -1.0; 
 	long totalcycle = 1;
 	int nattempts = 1;
 	int equilibrium = 0;
@@ -488,14 +493,20 @@ int main(int argc, char* argv[]) {
 	RepExSystem myresim;
 	SerTempSystem mystsim;	
 	int option_char;
+
+	int multiplyK = 0;
+	int multiplyM = 0;
+	int multiply_factor = 1;		
 	
 	srand (time(NULL));
 	
 	opterr = 0;	
-	while ((option_char = getopt(argc, argv, "hf:d:u:t:i:o:q:n:x:s:p:g:a:b:")) != -1) {
+	while ((option_char = getopt(argc, argv, "hkmf:d:u:t:i:o:q:n:x:s:p:g:a:b:")) != -1) {
 		switch (option_char) {
 		case 'h':
-			printf("%s -d data_file -f parameters_file -u potentialE_type -t temperature  -i input_unit -o output_unit -q equilibrium -n total_cycle -x nattempts -s print_list_of_states -p print_list_of_data -g print_freqG\n", argv[0]);
+			printf("%s -d observation_data_file -f state_information_file -u potential_function_type \
+-t temperature  -i input_unit -o output_unit -q equilibrium_length -n number_of_cycles \
+-x number_of_exchange_attempts -s print_list_of_states -p print_list_of_properties -g free_energy_print_frequency [-k -m]\n", argv[0]);
 			return 0;
 		case 'd': datafile = optarg; break;			
 		case 'f': parafile = optarg; break;
@@ -510,9 +521,13 @@ int main(int argc, char* argv[]) {
 		case 'p': printlist = optarg; break;
 		case 'g': printfreqG = atoi(optarg); break;
 		case 'a': alpha = atof(optarg); break;
-		case 'b': beta = atof(optarg); break;			
+		case 'b': beta = atof(optarg); break;
+		case 'k': multiplyK = 1; break;
+		case 'm': multiplyM = 1; break;
 		case '?': 
-			if ((optopt == 'd') || (optopt == 'f') || (optopt == 'u') || (optopt == 't') || (optopt == 'i') || (optopt == 'o') || (optopt == 'e') || (optopt == 'n') || (optopt == 'x') || (optopt == 's') || (optopt == 'p') || (optopt == 'q') || (optopt == 'a') || (optopt == 'b')) 
+			if ((optopt == 'd') || (optopt == 'f') || (optopt == 'u') || (optopt == 't') || (optopt == 'i') \
+				|| (optopt == 'o') || (optopt == 'e') || (optopt == 'n') || (optopt == 'x') || (optopt == 's') \
+				|| (optopt == 'p') || (optopt == 'q') || (optopt == 'a') || (optopt == 'b')) 
 				fprintf (stderr, "Option -%c requires an argument.\n", optopt);
 			else if (isprint (optopt))
 				fprintf (stderr, "Unknown option `-%c'.\n", optopt);
@@ -524,6 +539,19 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
+	// change numbers
+	if (multiplyK == 1) {
+		multiply_factor *= 1000;
+	}
+	if (multiplyK == 1) {
+		multiply_factor *= 1000000;
+	}
+	if (multiply_factor > 1) {
+		equilibrium *= multiply_factor;
+		totalcycle *= multiply_factor;
+		printfreqG *= multiply_factor;
+	}
+	
 	srand (time(NULL)); //random seed	
 
 	// print state: information of which states will be printed out
@@ -550,17 +578,18 @@ int main(int argc, char* argv[]) {
 	totalndata = dummym--;
 	ndata = datalist[0][0].size(); 
 	
-	// read state parameters		
-	if (parafile[0] != '\0') {
-		read_paralist(parafile, printstates);
-		npara = paralist[0].size();
-	}
-	else { // if no state parameters, the temperature of each state is determined by variable temper 
+	// the temperature of each state is determined by variable temper
+	if (temper > 0) {
 		for (int i=0; i<nstates; i++) {
 			vector<double>  paraarray;
 			paraarray.push_back(temper);
 			paralist.push_back(paraarray);
 		}
+	}
+	// read state parameters		
+	if (parafile[0] != '\0') {
+		read_paralist(parafile, printstates);
+		npara = paralist[0].size();
 	}
 
 	// begin analysis
