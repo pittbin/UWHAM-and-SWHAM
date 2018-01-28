@@ -543,7 +543,7 @@ int main(int argc, char* argv[]) {
 	if (multiplyK == 1) {
 		multiply_factor *= 1000;
 	}
-	if (multiplyK == 1) {
+	if (multiplyM == 1) {
 		multiply_factor *= 1000000;
 	}
 	if (multiply_factor > 1) {
