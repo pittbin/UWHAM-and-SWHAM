@@ -25,6 +25,8 @@
   | s | list of states to print out                         | -       |
   | p | list of properties of each observation to print out | 0       |
   | g | frequency of printing free energy estimates         | 0       |
+  | k | input numbers are in unit of one thousand           | -       |
+  | m | input numbers are in unit of one million            | -       |
   |---+-----------------------------------------------------+---------|
 
 ** options and descriptions
@@ -54,14 +56,14 @@
 	potential function $U[i][j][k]$ is the potential energy of the $i^{th}$ observation observed at the $j^{th}$
 	\(\lambda\)-state calculated by the Hamiltonian function of the $k^{th}$ \(\lambda\)-state in unit of $k_B T$.
     #+ATTR_HTML: :border 2 :rules all :frame border	 
-    |------+----------------------------------------------+------------------------------------------------------|
-    | type | description                                  | potential function $U[i][j][k]$                      |
-    |------+----------------------------------------------+------------------------------------------------------|
-    |    0 | UWHAM-like input                             | $D[i][j][k]/(K_B S[k][1])$                           |
-    |    1 | Temperature replica exchange                 | $D[i][j][1]/(K_B S[k][1])$                           |
-    |    2 | Hamiltonian replica exchange                 | $D[i][j][1]*S[k][2]/(K_B S[k][1])$                   |
-    |    3 | Temperature and Hamiltonian replica exchange | $(D[i][j][1]+D[i][j][2]*S[k][2])/(K_B S[k][1])$      |
-    |------+----------------------------------------------+------------------------------------------------------|
+    |------+----------------------------------------------+--------------------------------------------------------|
+    | type | description                                  | potential function $U[i][j][k]$                        |
+    |------+----------------------------------------------+--------------------------------------------------------|
+    |    0 | UWHAM-like input                             | $D[i][j][k]/(K_B S[k][1])$                             |
+    |    1 | Temperature replica exchange                 | $D[i][j][1]/(K_B S[k][1])$                             |
+    |    2 | Hamiltonian replica exchange                 | $D[i][j][1] \times S[k][2]/(K_B S[k][1])$              |
+    |    3 | Temperature and Hamiltonian replica exchange | $(D[i][j][1]+D[i][j][2] \times S[k][2])/(K_B S[k][1])$ |
+    |------+----------------------------------------------+--------------------------------------------------------|
 	In this table, $D[i][j][k]$ is the $k^{th}$ property of the $j^{th}$ observation observed at the $i^{th}$
 	\(\lambda\)-state. $S[k][1]$ is the first property, namely the temperature, of the $k^{th}$ \(\lambda\)-state.
 **** UWHAM-like input (-u 0)

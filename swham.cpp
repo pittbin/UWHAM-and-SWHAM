@@ -442,7 +442,7 @@ void SerTempSystem::printfreeE(vector<int>& printstates, int nfreeE) {
 		printf("%12g ", result);
 		sum_of_freeE[i] = 0.0;
 	}
-	sdvalue = standard_deviation()/(nfreeE*1.0/nstates);
+	sdvalue = standard_deviation();
 	for (int i=0; i<nstates; i++) {
 		pi1[i] = 0;
 	}
@@ -451,22 +451,22 @@ void SerTempSystem::printfreeE(vector<int>& printstates, int nfreeE) {
 	printf("\n");		
 }
 
+
 double SerTempSystem::standard_deviation() {
 	double result;
 	double sum=0.0;
 	double sum2=0.0;
-	double aver;
 	
 	for (int i=0; i<nstates; i++) {
 		sum += pi1[i];
 	}
-	aver = sum/(nstates*1.0);
 	for (int i=0; i<nstates; i++) {
-		sum2 += pow((pi1[i] - aver), 2);
+		sum2 += pow((pi1[i]*1.0/sum - nobs[i]*1.0/totalndata), 2);
 	}
 	result = sqrt(sum2/(nstates*1.0));
 	return(result);
 }
+
 
 /*****************************************************************************************************/
 int main(int argc, char* argv[]) {
