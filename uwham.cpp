@@ -550,6 +550,14 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
+	// print out the command line:
+	cout << "#\033[1;33m#Command Line: \033[0m";	
+	char* command;
+	for(int i = 0; i < argc; i++) {
+		printf("%s ", argv[i]);		
+	}
+	printf("\n");	
+
 	// read the print list for weights
 	if (printlist[0] != '\0') {
 		readlist(printlist, printitems);
