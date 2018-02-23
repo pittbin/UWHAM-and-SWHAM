@@ -29,11 +29,9 @@ vector<int> nobs; // how many observations at each state
 
 vector<vector<double> > paralist;
 vector<vector<vector<double> > > datalist;
-vector<vector<vector<double> > > bias_matrix; // this is the bias matrix totalndata*nstates
 int pftype; // potential function type
 int inunit; // input data unit
 int outunit; // output data unit
-int costmem = 0; // cost memory
 
 double potential_energy(int datasid, int datanid, int stateid) {
 	double potential;
@@ -77,38 +75,6 @@ double potential_energy(int datasid, int datanid, int stateid) {
 	}
 	return potential;
 }
-
-void cal_bias_matrix() {
-	//calculate all the potentail energies
-	for (int i=0; i<nstates; i++) {
-		vector<vector<double> > tmpstate;
-		for (int j=0; j<nobs[i]; j++) {
-			vector<double> tmpobservation;
-			double minpE = 1.0e100;
-			for (int k=0; k<nstates; k++) {
-				double tmppE = potential_energy(i, j, k);
-				tmpobservation.push_back(tmppE);
-				if (tmppE < minpE) {
-					minpE = tmppE;
-				}
-			}
-			for (int k=0; k<nstates; k++) {
-				tmpobservation[k] -= minpE;
-			}
-			tmpstate.push_back(tmpobservation);
-		}
-		bias_matrix.push_back(tmpstate);
-	}
-	// change it into biasing factor
-	for (int i=0; i<nstates; i++) {
-		for (int j=0; j<nobs[i]; j++) {
-			for (int k=0; k<nstates; k++) {
-				bias_matrix[i][j][k] = exp(-bias_matrix[i][j][k]);				
-			}
-		}
-	}
-}
-
 
 void read_datalist(const char* filename) {
 	ifstream read_file;
@@ -319,16 +285,11 @@ void RepExSystem::exchange_attempts(int nattempts) {
 		n_state_id = walker[n].get_state_id();
 		n_datum_id = walker[n].get_datum_id();
 
-		if (costmem == 0) {
-			factor = exp(-(potential_energy(n_state_id, n_datum_id, m_state_id) +
-						   potential_energy(m_state_id, m_datum_id, n_state_id) -
-						   potential_energy(m_state_id, m_datum_id, m_state_id) -
-						   potential_energy(n_state_id, n_datum_id, n_state_id)));			
-		}
-		else {
-			factor = bias_matrix[n_state_id][n_datum_id][m_state_id]*bias_matrix[m_state_id][m_datum_id][n_state_id];
-			factor /= bias_matrix[m_state_id][m_datum_id][m_state_id]*bias_matrix[n_state_id][n_datum_id][n_state_id];
-		}
+
+		factor = exp(-(potential_energy(n_state_id, n_datum_id, m_state_id) +
+					   potential_energy(m_state_id, m_datum_id, n_state_id) -
+					   potential_energy(m_state_id, m_datum_id, m_state_id) -
+					   potential_energy(n_state_id, n_datum_id, n_state_id)));			
 		
 		if (factor < 1) {
 			randnum = (double)rand()/(double)(RAND_MAX + 1.0);
@@ -414,17 +375,10 @@ void SerTempSystem::cal_DoS() {
 	for (int i=0; i<nstates; i++) {
 		for (int j=0; j<nobs[i]; j++) {
 			dos = 0.0;
-			if (costmem == 0) {
-				basepe = potential_energy(i, j, i);
-			}
+			basepe = potential_energy(i, j, i);
 			for (int k=0; k<nstates; k++) {
-				if (costmem == 0) {
-					biaspe = potential_energy(i, j, k);
-					dos += nobs[k]*exp(-(biaspe - basepe))/pf[k];
-				}
-				else {
-					dos += nobs[k]*bias_matrix[i][j][k]/bias_matrix[i][j][i]/pf[k];					
-				}
+				biaspe = potential_energy(i, j, k);
+				dos += nobs[k]*exp(-(biaspe - basepe))/pf[k];
 			}
 			dos = 1.0/dos;
 			fprintf(write_file, "%12g\n", dos);
@@ -481,13 +435,8 @@ int SerTempSystem::jump() {
 	state_id = walker.get_state_id();
 	datum_id = walker.get_datum_id();
 	for (int i=0; i<nstates; i++) {
-		if (costmem == 0) {
-			// tmpprob = pi0[i]*exp(freeE[i])*exp(-potential_energy(state_id, datum_id, i));
-			tmpprob = pi0[i]*exp(freeE[i]-potential_energy(state_id, datum_id, i));			
-		}
-		else {
-			tmpprob = pi0[i]*exp(freeE[i])*bias_matrix[state_id][datum_id][i];
-		}
+		// tmpprob = pi0[i]*exp(freeE[i])*exp(-potential_energy(state_id, datum_id, i));
+		tmpprob = pi0[i]*exp(freeE[i]-potential_energy(state_id, datum_id, i));			
 		sum += tmpprob;
 		prob.push_back(tmpprob);
 	}
@@ -587,12 +536,12 @@ int main(int argc, char* argv[]) {
 	srand (time(NULL));
 	
 	opterr = 0;	
-	while ((option_char = getopt(argc, argv, "hkmwcf:d:u:t:i:o:q:n:x:s:p:g:a:b:")) != -1) {
+	while ((option_char = getopt(argc, argv, "hkmwf:d:u:t:i:o:q:n:x:s:p:g:a:b:")) != -1) {
 		switch (option_char) {
 		case 'h':
 			printf("%s -d observation_data_file -f state_information_file -u potential_function_type \
 -t temperature  -i input_unit -o output_unit -q equilibrium_length -n number_of_cycles \
--x number_of_exchange_attempts -s print_list_of_states -p print_list_of_properties -g free_energy_print_frequency [-c -k -m -w]\n", argv[0]);
+-x number_of_exchange_attempts -s print_list_of_states -p print_list_of_properties -g free_energy_print_frequency [-k -m -w]\n", argv[0]);
 			return 0;
 		case 'd': datafile = optarg; break;			
 		case 'f': parafile = optarg; break;
@@ -611,7 +560,6 @@ int main(int argc, char* argv[]) {
 		case 'k': multiplyK = 1; break;
 		case 'm': multiplyM = 1; break;
 		case 'w': printwtag = 1; break;
-		case 'c': costmem = 1; break;
 		case '?': 
 			if ((optopt == 'd') || (optopt == 'f') || (optopt == 'u') || (optopt == 't') || (optopt == 'i') \
 				|| (optopt == 'o') || (optopt == 'e') || (optopt == 'n') || (optopt == 'x') || (optopt == 's') \
@@ -689,10 +637,6 @@ int main(int argc, char* argv[]) {
 	}
 
 	// begin analysis
-	if (costmem == 1) {
-		cal_bias_matrix();
-	}
-	
 	if (printfreqG > 0) { // run Serial Tempering SWHAM
 		if (equilibrium == 0) {
 			equilibrium = printfreqG;
