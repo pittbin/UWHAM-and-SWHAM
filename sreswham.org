@@ -1,0 +1,138 @@
+#+OPTIONS: ^:nil
+#+TITLE: SWHAM
+
+* how to install
+  - compile:
+    #+BEGIN_SRC 
+	g++ sreswham.cpp -lm -o sreswham.o
+    #+END_SRC
+
+* list of options:
+  #+ATTR_HTML: :border 2 :rules all :frame border
+  |---+-----------------------------------------------------+---------|
+  |   | simple description                                  | default |
+  |---+-----------------------------------------------------+---------|
+  | h | print out help information                          | -       |
+  | d | input file contains information of observations     | -       |
+  | f | input file contains information of states           | -       |
+  | a | number of disconnected macrostate clusters          |         |
+  | u | type of the potential function                      | -       |
+  | t | temperature                                         | -1.0    |
+  | i | unit of potential energies in the input file        | 0       |
+  | o | unit of free energies of the output                 | 0       |
+  | q | length of the equilibrium period                    | -       |
+  | n | number of the RE or ST cycles                       | -       |
+  | x | number of exchange attempts in RE                   | -       |
+  | s | list of states to print out                         | -       |
+  | p | list of properties of each observation to print out | 0       |
+  | k | input numbers are in unit of one thousand           | -       |
+  | m | input numbers are in unit of one million            | -       |
+  |---+-----------------------------------------------------+---------|
+
+** options and descriptions
+*** -d observation_data_file
+    The "observation_data_file" contains information of observations. Like the input file for UWHAM, this file contains
+    $M$ blocks. Each block corresponds to a \(\lambda\)-state. At the beginning of each block, there is a comment line
+    or multiple comment lines starting with "@" or "#". Do not leave blank lines between blocks. After comments lines,
+    there is a $N_i \times K$ matrix, where $N_i$ is the total number of observations observed at the $i^{th}$ state and
+    $K$ is the total number of properties of each observation. To apply Stratified RE-SWHAM, the last property of each
+    observation is the index of the macrostate cluster which this observation belongs to. The index of macrostate
+    clusters starts from one (not zero).
+
+*** -f state_information_file
+	This file contains $M$ lines. Each line represents a \(\lambda\)-state. If the value of temperature defined by "-t"
+	option is negative, the first item of each line is the temperature of that \(\lambda\)-state. Usually, the next item
+	of each line can be the lambda value of that \(\lambda\)-state. To apply Stratified RE-SWHAM, the last item of each
+	line is the tag marking whether this \(\lambda\)-state is fully connected ("1" means true; "0" means false). 
+
+*** -a number_of_macrostate 
+	How many macrostates or macrostate clusters defined in this system.
+
+*** -t temperature
+    The temperature of all the simulations. This option is only useful when the simulations are run at a single
+    temperature. The default value of this option is $-1$. If "temperature" is negative, the temperature of each
+    state is defined be the first float number of each line in the "state_information_file", see option "-f".
+
+*** -u potential_function_type
+	The potential energy (biasing potential energy) can be calculated for each observation at any \(\lambda\)-state. As
+	shown in the following table, four different potential functions have been implemented in the SWHAM code. The
+	potential function $U[i][j][k]$ is the potential energy of the $i^{th}$ observation observed at the $j^{th}$
+	\(\lambda\)-state calculated by the Hamiltonian function of the $k^{th}$ \(\lambda\)-state in unit of $k_B T$.
+    #+ATTR_HTML: :border 2 :rules all :frame border	 
+    |------+----------------------------------------------+--------------------------------------------------------|
+    | type | description                                  | potential function $U[i][j][k]$                        |
+    |------+----------------------------------------------+--------------------------------------------------------|
+    |    0 | UWHAM-like input                             | $D[i][j][k]/(K_B S[k][1])$                             |
+    |    1 | Temperature replica exchange                 | $D[i][j][1]/(K_B S[k][1])$                             |
+    |    2 | Hamiltonian replica exchange                 | $D[i][j][1] \times S[k][2]/(K_B S[k][1])$              |
+    |    3 | Temperature and Hamiltonian replica exchange | $(D[i][j][1]+D[i][j][2] \times S[k][2])/(K_B S[k][1])$ |
+    |------+----------------------------------------------+--------------------------------------------------------|
+	In this table, $D[i][j][k]$ is the $k^{th}$ property of the $j^{th}$ observation observed at the $i^{th}$
+	\(\lambda\)-state. $S[k][1]$ is the first property, namely the temperature, of the $k^{th}$ \(\lambda\)-state.
+**** UWHAM-like input (-u 0)
+	 This option allows the SWHAM program to use the UWHAM input, where $D[i][j][k]$ is the potential energy of the
+	 $j^{th}$ observation observed at the $i^{th}$ \(\lambda\)-state calculated by the Hamiltonian function of the
+	 $k^{th}$ \(\lambda\)-state. Therefore, each observation has at least $M$ properties, where $M$ is the total number
+	 of \(\lambda\)-states.
+**** Temperature replica exchange (-u 1)
+	 This potential function is implemented to analyze the data generated by temperature replica exchange (RE)
+	 simulations. In the "observation_data_file", the first property of each observation $D[i][j][1]$ is the potential
+	 energy of that observation. Note in temperature RE simulations, the Hamiltonian functions of all \(\lambda\)-state
+	 are the same. More properties can be appended after the potential energy. In the "state_information_file", the
+	 first property of each state $S[k][1]$ is the temperature of that state.
+**** Hamiltonian replica exchange (-u 2)
+	 This potential function is implemented to analyze the data generated by Hamiltonian replica exchange
+	 simulations. To use this type of potential function, the first property of each observation in the
+	 "observation_data_file" $D[i][j][1]$ is the Hamiltonian energy part controlled by the parameter $\lambda$. In
+	 Hamiltonian RE simulations, all the simulations are run at the same temperature. Therefore, the temperature
+	 ($S[k][1]$) can be inputted by using the '-t' option. The first property of each state in the
+	 "state_information_file" ($S[k][2]$) is the $\lambda$ value of that \(\lambda\)-state.
+**** Temperature and Hamiltonian replica exchange (-u 3)
+	 This potential function is implemented to analyze the data generated by Temperature and Hamiltonian replica
+	 exchange simulations. The first property of each observation in the "observation_data_file" $D[[i][j][1]$ is the
+	 Hamiltonian energy part which is not controlled by the parameter $\lambda$, and the second property of each
+	 observation $D[i][j][2]$ is the Hamiltonian energy part which is controlled by the parameter $\lambda$. The first
+	 property of each state in the "state_information_file" $S[k][1]$ is the temperature of that state, and the second
+	 property $S[k][2]$is the $\lambda$ value of that state.
+
+*** -i input_unit -o output_unit
+	The unit of energies in the input and output. The default unit for potential energies used in UWHAM is $k_B
+    T$. However, if the data are generated by simulations running at a single temperature, UWHAM program can read and
+    output energies in a different unit. For these two options, "0" represents $k_B T$; "1" represents $kcal/mol$; and
+    "2" represents "kJ/mol".
+
+*** -q equilibrium_length
+	How many cycles to run to equilibrate the system. Both RE-SWHAM and ST-SWHAM are run by cycles. No results are
+	printed out During the equilibrium.
+
+*** -n number_of_cycles
+	This option specifies how many cycles to be run after equilibrium. 
+
+*** -x number_of_exchange_attempts
+	This option specifies how many exchange attempts should be in the exchange procedure of RE-SWHAM cycle. To reach the
+	infinite exchange limit, a number between $M^2$ and $M^3$ is recommended, where $M$ is the total number of
+	\(\lambda\)-state of the system. 
+
+*** -s print_list_of_states
+    "print_list_of_states" is a list of \(\lambda\)-state indexes. For example, "1,3,5" means the first, the third and
+    the fifth \(\lambda\)-states; "2-4" represents the second, the third and the fourth \(\lambda\)-states; and
+    "1,3-5,9" represents the first, the third, the fourth, the fifth and the ninth \(\lambda\)-states. Note the index
+    of \(\lambda\)-state starts from one, not zero. When the data are analyzed by RE-SWHAM (see option "-g"), the
+    properties of the observation (see option "-p") sampled at those states listed in "print_list_of_states" will be
+    printed out every RE cycle. If the data are analyzed by ST-SWHAM (see option "-g"), the free energy estimates of
+    those states listed in "print_list_of_states" will be printed out. The number of ST cycles between printing out free
+    energy estimates during the ST-SWHAM is controlled by option "-g".
+
+*** -p print_list_of_properties
+	"print_list_of_properties" is a list of properties indexes. This option is only meaningful for RE-SWHAM
+	analysis. During RE-SWHAM analysis, the properties listed in "print_list_of_properties" of the observation sampled
+	at those states listed in "print_list_of_states" (see option "-s") will be printed out every RE cycle. Note the
+	index starts from one, not zero. If "print_list_of_properties" contains one single value zero (-p 0), the index of
+	the observation (see option "-d") will be printed out.
+
+*** -k -m
+	These two options are used to reduce the zeros for the input of option "-q", "-n" and "-g". If the "-k" switch is
+	turned on, the input numbers of option "-q", "-n" and "-g" are in unit of one thousand. If the "-m" switch is
+	turned on, the input numbers of option "-q", "-n" and "-g" are in unit of one million. If both are used, the input
+	numbers of those options are in unit of one billion.  
+
