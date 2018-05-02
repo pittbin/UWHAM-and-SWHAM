@@ -568,13 +568,11 @@ int main(int argc, char* argv[]) {
 	for (int i=0; i<nstates; i++) {
 		totalndata += nobs[i];
 	}
-	if (gromacs < 0) {
-		shift_bias_energy_matrix();
-	}
-	else {
+	if (gromacs >= 0) {
 		convert_bias_energy_matrix_from_gromacs(gromacs);
 		inunit = 2;
 	}
+	shift_bias_energy_matrix();	
 	// get unit change constant
 	unit_factor_in = others_2_kBT(inunit, temper);
 	unit_factor_out = kBT_2_others(outunit, temper);
