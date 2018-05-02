@@ -8,6 +8,7 @@
 #include <math.h>  // floor
 #include <stdio.h> // printf
 #include <unistd.h>
+#include <algorithm> // find
 
 using std::vector;
 using std::cout;
@@ -16,6 +17,7 @@ using std::string;
 using std::ifstream;
 using std::istringstream;
 using std::size_t;
+using std::find;
 
 const double kB = 0.0019872041; // unit kcal/mol
 const double pi = 3.1415926;
@@ -27,8 +29,10 @@ int ndata = 0; // how mnay data for one observation
 long totalndata = 0; // total number of observations
 vector<int> nobs; // how many observations at each state
 
-vector<vector<double> > paralist;
-vector<vector<vector<double> > > datalist;
+vector<vector<double> > paralist; // state information
+vector<vector<vector<double> > > datalist; // data points
+vector<vector<int> > nearest_neighbors; // nearest neighbors of states
+
 int pftype; // potential function type
 int inunit; // input data unit
 int outunit; // output data unit
@@ -74,6 +78,150 @@ double potential_energy(int datasid, int datanid, int stateid) {
 		break;}		
 	}
 	return potential;
+}
+
+
+void find_nearest_neighbors() {
+	void oneD_nearest_neighbors(int para_index, int period_index);
+	void twoD_nearest_neighbors(int para_index1, int para_index2, int period_index1, int period_index2);
+	
+	switch (pftype) {
+	case 0: { // assign neighbors by the order of states, always treat as periodic
+		vector<int> tmpneighbors;
+		tmpneighbors.push_back(1);
+		tmpneighbors.push_back(nstates-1);		
+		nearest_neighbors.push_back(tmpneighbors);
+		tmpneighbors.clear();
+		for (int j=1; j<(nstates-1); j++) {
+			tmpneighbors.push_back(j-1);			
+			tmpneighbors.push_back(j+1);
+			nearest_neighbors.push_back(tmpneighbors);
+			tmpneighbors.clear();			
+		}
+		tmpneighbors.push_back(0);		
+		tmpneighbors.push_back(nstates-2);
+		nearest_neighbors.push_back(tmpneighbors);
+		tmpneighbors.clear();		
+		break;
+	}
+	case 1: oneD_nearest_neighbors(0, -1); break; // Temperature RE
+	case 2: oneD_nearest_neighbors(1, -1); break; // Hamiltonian RE
+	case 3: twoD_nearest_neighbors(0, 1, -1, -1); break; // 2D RE
+	case 4: oneD_nearest_neighbors(2, 3); break; // 1D umbrella sampling, possible periodic
+	case 5: twoD_nearest_neighbors(3, 4, 5, 6); break; // 2D umbrella sampling, possible periodic
+	}
+}
+
+void oneD_nearest_neighbors(int para_index, int period_index) {
+	double neg_diff, pos_diff, diff;
+	int neg_stateid, pos_stateid;
+
+	for (int i=0; i<nstates; i++) {
+		vector<int> tmpneighbors;
+		neg_diff = -1.0e100;
+		pos_diff = 1.0e100;
+		neg_stateid = -1;
+		pos_stateid = -1;
+		vector<double> testvalues;
+		testvalues.push_back(paralist[i][para_index]);	   
+		if ((period_index > 0) && (paralist.size() > period_index)) {
+			testvalues.push_back(paralist[i][para_index]+paralist[i][period_index]);
+			testvalues.push_back(paralist[i][para_index]-paralist[i][period_index]);			
+		}
+		for (int k=0; k<testvalues.size(); k++) {
+			for (int j=0; j<nstates; j++) {
+				if (i != j) {
+					diff = paralist[j][para_index] - testvalues[k];
+					if ( (diff < 0.0) && (diff > neg_diff)) {
+						neg_diff = diff;
+						neg_stateid = j;
+					}
+					if ( (diff > 0.0) && (diff < pos_diff)) {
+						pos_diff = diff;
+						pos_stateid = j;
+					}				
+				}
+			}
+		}
+		if (neg_stateid >= 0) {
+			tmpneighbors.push_back(neg_stateid);
+		}
+		if (pos_stateid >= 0) {
+			tmpneighbors.push_back(pos_stateid);
+		}
+		nearest_neighbors.push_back(tmpneighbors);
+	}
+}
+
+void twoD_nearest_neighbors(int para_index1, int para_index2, int period_index1, int period_index2) {
+	double first_neg_diff, first_pos_diff, second_neg_diff, second_pos_diff, first_diff, second_diff;
+	int first_neg_stateid, first_pos_stateid, second_neg_stateid, second_pos_stateid;
+
+	for (int i=0; i<nstates; i++) {
+		// prepare
+		vector<int> tmpneighbors;
+		first_neg_diff = -1.0e100;
+		second_neg_diff = -1.0e100;		
+		first_pos_diff = 1.0e100;
+		second_pos_diff = 1.0e100;		
+		first_neg_stateid = -1;
+		second_neg_stateid = -1;		
+		first_pos_stateid = -1;
+		second_pos_stateid = -1;
+		vector<double> testvalues1;
+		testvalues1.push_back(paralist[i][para_index1]);
+		if ((period_index1 > 0) && (paralist.size() > period_index1)) {
+			testvalues1.push_back(paralist[i][para_index1]+paralist[i][period_index1]);
+			testvalues1.push_back(paralist[i][para_index1]-paralist[i][period_index1]);			
+		}
+		vector<double> testvalues2;
+		testvalues2.push_back(paralist[i][para_index2]);
+		if ((period_index2 > 0) && (paralist.size() > period_index2)) {
+			testvalues2.push_back(paralist[i][para_index2]+paralist[i][period_index2]);
+			testvalues2.push_back(paralist[i][para_index2]-paralist[i][period_index2]);			
+		}
+		// search states
+		for (int k1=0; k1<testvalues1.size(); k1++) {
+			for (int k2=0; k2<testvalues2.size(); k2++) {			
+				for (int j=0; j<nstates; j++) {
+					if (i != j) {
+						first_diff = paralist[j][para_index1] - testvalues1[k1];
+						second_diff = paralist[j][para_index2] - testvalues2[k2];
+						if ((second_diff == 0.0) && (first_diff < 0.0) && (first_diff > first_neg_diff)) {
+							first_neg_diff = first_diff;
+							first_neg_stateid = j;
+						}
+						if ((second_diff == 0.0) && (first_diff > 0.0) && (first_diff < first_pos_diff)) {
+							first_pos_diff = first_diff;
+							first_pos_stateid = j;
+						}
+						if ((first_diff == 0.0) && (second_diff < 0.0) && (second_diff > second_neg_diff)) {
+							second_neg_diff = second_diff;
+							second_neg_stateid = j;
+						}
+						if ((first_diff == 0.0) && (second_diff > 0.0) && (second_diff < second_pos_diff)) {
+							second_pos_diff = second_diff;
+							second_pos_stateid = j;
+						}				
+					}
+				}
+			}
+		}
+		// add to array
+		if (first_neg_stateid >= 0) {
+			tmpneighbors.push_back(first_neg_stateid);
+		}
+		if (first_pos_stateid >= 0) {
+			tmpneighbors.push_back(first_pos_stateid);
+		}
+		if (second_neg_stateid >= 0) {
+			tmpneighbors.push_back(second_neg_stateid);
+		}
+		if (second_pos_stateid >= 0) {
+			tmpneighbors.push_back(second_pos_stateid);
+		}
+		nearest_neighbors.push_back(tmpneighbors);
+	}
 }
 
 void read_datalist(const char* filename) {
@@ -158,6 +306,8 @@ void readlist(const char* liststring, vector<int>& listitems) {
 		}
 	}
 }
+
+
 
 class RandomWalker {
 private:
@@ -341,7 +491,8 @@ private:
 public:
 	void init_SerTempSystem();
 	void update_freeE(int state_id, int burnin, long icycle, double alpha, double beat);
-	int jump();
+	int global_jump();
+	int local_jump(int njumps); 
 	void MDupdate();
 	void printfreeE(vector<int>& printstates, int nfreeE);
 	double standard_deviation();
@@ -425,7 +576,7 @@ void SerTempSystem::update_freeE(int state_id, int burnin, long icycle, double a
 }
 
 
-int SerTempSystem::jump() {
+int SerTempSystem::global_jump() {
 	double tmpprob;
 	int state_id, datum_id, new_state_id;
 	vector<double> prob;
@@ -450,6 +601,48 @@ int SerTempSystem::jump() {
 		}
 	}
 	return(new_state_id);
+}
+
+int SerTempSystem::local_jump(int njumps) {
+	double factor;
+	int state_id, datum_id, new_state_id, current_state_id;
+	double randnum, prob_try_n2o, prob_try_o2n;
+	int ijump, wjump;
+	
+	state_id = walker.get_state_id();
+	datum_id = walker.get_datum_id();
+	current_state_id = state_id;
+	
+	ijump = 0;
+	while (ijump < njumps) {
+		randnum = (double)rand()/(double)(RAND_MAX + 1.0);
+		int tmpid = floor(randnum*nearest_neighbors[current_state_id].size());
+		new_state_id = nearest_neighbors[current_state_id][tmpid];
+		prob_try_o2n = 1.0/nearest_neighbors[current_state_id].size();
+		if (find(nearest_neighbors[new_state_id].begin(), nearest_neighbors[new_state_id].end(), current_state_id)
+			!= nearest_neighbors[new_state_id].end()) {
+			prob_try_n2o = 1.0/nearest_neighbors[new_state_id].size();
+		}
+		else {
+			prob_try_n2o = 0.0;
+		}
+		factor = pi0[new_state_id]/pi0[current_state_id]*exp((freeE[new_state_id]-potential_energy(state_id, datum_id, new_state_id))
+				 - (freeE[current_state_id]-potential_energy(state_id, datum_id, current_state_id)))*prob_try_n2o/prob_try_o2n;
+		// Metropolis
+		wjump = 1;
+		if (factor < 1) {
+			randnum = (double)rand()/(double)(RAND_MAX + 1.0);
+			if (randnum > factor) {
+				wjump = 0;
+			}
+		}
+		if (wjump == 1) {
+			current_state_id = new_state_id;
+		}
+		ijump++;
+	}
+	// printf("%5d\n", current_state_id);
+	return(current_state_id);
 }
 
 void SerTempSystem::printfreeE(vector<int>& printstates, int nfreeE) {
@@ -517,7 +710,7 @@ int main(int argc, char* argv[]) {
 
 	double temper = -1.0; 
 	long totalcycle = 1;
-	int nattempts = 1;
+	int nattempts = 0;
 	int equilibrium = 0;
 	int printfreqG = 0;
 	double alpha = 0.5;
@@ -540,7 +733,7 @@ int main(int argc, char* argv[]) {
 		case 'h':
 			printf("%s -d observation_data_file -f state_information_file -u potential_function_type \
 -t temperature  -i input_unit -o output_unit -q equilibrium_length -n number_of_cycles \
--x number_of_exchange_attempts -s print_list_of_states -p print_list_of_properties -g free_energy_print_frequency [-k -m -w]\n", argv[0]);
+-x number_of_attempts -s print_list_of_states -p print_list_of_properties -g free_energy_print_frequency [-k -m -w]\n", argv[0]);
 			return 0;
 		case 'd': datafile = optarg; break;			
 		case 'f': parafile = optarg; break;
@@ -620,7 +813,8 @@ int main(int argc, char* argv[]) {
 	}
 	totalndata = dummym--;
 	ndata = datalist[0][0].size(); 
-	
+
+	// state information
 	// the temperature of each state is determined by variable temper
 	if (temper > 0) {
 		for (int i=0; i<nstates; i++) {
@@ -634,7 +828,9 @@ int main(int argc, char* argv[]) {
 		read_paralist(parafile, printstates);
 		npara = paralist[0].size();
 	}
-
+	// decide nearest neighbors
+	find_nearest_neighbors();
+		
 	// begin analysis
 	if (printfreqG > 0) { // run Serial Tempering SWHAM
 		if (equilibrium == 0) {
@@ -644,8 +840,14 @@ int main(int argc, char* argv[]) {
 
 		long icycle = 0;
 		while(icycle <= (totalcycle + equilibrium)) {
+			int newid;
 			mystsim.MDupdate();
-			int newid = mystsim.jump();
+			if (nattempts == 0) {
+				newid = mystsim.global_jump();
+			}
+			else {
+				newid = mystsim.local_jump(nattempts);				
+			}
 			mystsim.update_freeE(newid, equilibrium, icycle, alpha, beta);		
 			if (icycle > equilibrium) {
 				if ((icycle-equilibrium)%printfreqG==0) {
@@ -660,7 +862,9 @@ int main(int argc, char* argv[]) {
 	}
 	else { // run Replica Exchange SWHAM
 		myresim.init_RepExSystem();
-
+		if (nattempts == 0) { // in case forget set -x
+			nattempts = 1;
+		}
 		long icycle = 0;
 		while(icycle < (totalcycle + equilibrium)) {
 			myresim.MDupdate();
@@ -671,6 +875,7 @@ int main(int argc, char* argv[]) {
 			icycle++;		
 		}
 	}
+	
 	// time
 	time (&end);
 	double dif = difftime (end,start);
