@@ -90,7 +90,7 @@
 *** -e tolerance_error -n iteration_number
     At the end of each iteration, the UWHAM program calculates the changes of free energy estimates 
     \begin{equation}
-    \Delta f = \left | \frac {f_{new} - f_{old}}{f_{old}} right | 
+    \Delta f = \left | \frac {f_{new} - f_{old}}{f_{old}} \right | 
     \end{equation}
 	for each \(\lambda\)-state. If all the $\Delta f$ are smaller than the tolerance_error or the number of iteration is
     larger than the "iteration_number", the UWHAM program will stop and write the output.
