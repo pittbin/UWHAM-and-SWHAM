@@ -448,7 +448,7 @@ void final_print_out(int unit, double factor) {
 	}
 
 	printf("\n");
-	printf("\033[1;33mThe free energy differences in unit of \033[0m\033[1;31m%s\033[0m:\n", unitname);
+	printf("\033[1;33mThe free energy differences in units of \033[0m\033[1;31m%s\033[0m:\n", unitname);
 	for (int i=0; i<nstates; i++) {
 		fe = cal_free_energy(i);
 		fe *= factor;
@@ -481,7 +481,7 @@ void initial_print_out(int unit) {
 		printf("%12d ", nobs[i]);
 	}
 	printf("\n");
-	cout << "\033[1;33mUnit of input data:\033[0m";
+	cout << "\033[1;33mUnit of the input data:\033[0m";
 	printf("\033[1;31m%10s\033[0m\n\n", unitname);
 }
 
