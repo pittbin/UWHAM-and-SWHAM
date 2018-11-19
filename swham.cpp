@@ -667,11 +667,11 @@ void SerTempSystem::printfreeE(vector<int>& printstates, int nfreeE) {
 		}
 		result = sum_of_freeE[printstates[i]-1]/(nfreeE*1.0)*unitfactor;
 		printf("%12g ", result);
-		sum_of_freeE[i] = 0.0;
 	}
 	sdvalue = standard_deviation();
 	for (int i=0; i<nstates; i++) {
 		pi1[i] = 0;
+		sum_of_freeE[i] = 0.0;		
 	}
 	printf("\033[1;33mSD:\033[0m");
 	printf("%12g", sdvalue);
